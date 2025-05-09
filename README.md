@@ -1,71 +1,82 @@
-# Projet de Détection de Panneaux de Signalisation
+# Traffic Sign Detection - Java OpenCV + VLCJ
 
-Ce projet utilise OpenCV 2.4.13 pour la détection de panneaux de signalisation en temps réel.
-
-## Structure du Projet
-
-```
-.
-├── src/                    # Code source Java
-├── lib/                    # Bibliothèques JAR (OpenCV)
-├── native_libs/           # Bibliothèques natives OpenCV
-├── reference_signs/       # Images de référence des panneaux
-└── README.md              # Ce fichier
-```
+Ce projet permet de détecter les panneaux de signalisation en temps réel sur une vidéo lue avec VLCJ.
 
 ## Prérequis
 
-1. JDK 8 (ou version compatible avec OpenCV 2.4.13)
-2. OpenCV 2.4.13 pour Java
-   - Fichier JAR : `opencv-2413.jar`
-   - Bibliothèque native : `opencv_java2413.dll` (Windows) / `libopencv_java2413.so` (Linux) / `libopencv_java2413.dylib` (macOS)
+- Java JDK 8 ou supérieur
+- OpenCV 2.4.13 pour Java (lib/opencv-2413.jar et native_libs/opencv_java2413.dll)
+- VLC installé sur la machine (pour VLCJ)
+- Les fichiers JAR suivants dans le dossier `lib/` :
+  - `vlcj-4.x.x.jar`
+  - `jna.jar`
+  - `jna-platform.jar`
+  - `opencv-2413.jar`
+- Les images de référence des panneaux dans `reference_signs/` (nommées `ref_XX.jpg` ou `ref_XX.png`)
+- Une vidéo de test (ex: `video1.avi`) à la racine du projet
 
-## Installation
+## Structure du projet
 
-1. Téléchargez OpenCV 2.4.13 depuis le site officiel
-2. Copiez `opencv-2413.jar` dans le dossier `lib/`
-3. Copiez la bibliothèque native appropriée dans le dossier `native_libs/`
-4. Placez vos images de référence des panneaux dans le dossier `reference_signs/`
+```
+.
+├── src/
+│   └── TrafficSignDetector.java
+├── lib/
+│   ├── opencv-2413.jar
+│   ├── vlcj-4.x.x.jar
+│   ├── jna.jar
+│   └── jna-platform.jar
+├── native_libs/
+│   └── opencv_java2413.dll
+├── reference_signs/
+│   └── ref_XX.jpg
+├── video1.avi
+└── README.md
+```
 
 ## Compilation
 
+Sous Windows :
 ```bash
-# Windows
-javac -cp ".;lib/opencv-2413.jar" src/TrafficSignDetector.java
-
-# Linux/macOS
-javac -cp ".:lib/opencv-2413.jar" src/TrafficSignDetector.java
+javac -cp ".;lib/*" -d . src/TrafficSignDetector.java
+```
+Sous Linux/Mac :
+```bash
+javac -cp ".:lib/*" -d . src/TrafficSignDetector.java
 ```
 
 ## Exécution
 
+Sous Windows :
 ```bash
-# Windows
-java -Djava.library.path="native_libs" -cp ".;lib/opencv-2413.jar" TrafficSignDetector
-
-# Linux/macOS
-java -Djava.library.path="native_libs" -cp ".:lib/opencv-2413.jar" TrafficSignDetector
+java -cp ".;lib/*" TrafficSignDetector
+```
+Sous Linux/Mac :
+```bash
+java -cp ".:lib/*" TrafficSignDetector
 ```
 
-## Configuration IDE
+## Utilisation
 
-### Eclipse
-1. Ajoutez `lib/opencv-2413.jar` au Build Path
-2. Dans Run Configurations, ajoutez `-Djava.library.path="chemin/absolu/vers/native_libs"` dans VM arguments
-
-### IntelliJ IDEA
-1. Ajoutez `lib/opencv-2413.jar` aux dépendances du projet
-2. Dans Run Configurations, ajoutez `-Djava.library.path="chemin/absolu/vers/native_libs"` dans VM options
+- Placez vos images de référence dans `reference_signs/` (ex: `ref_30.jpg`, `ref_50.jpg`...)
+- Placez votre vidéo de test à la racine du projet (ex: `video1.avi`)
+- Lancez le programme :
+  - La vidéo originale s'affiche à gauche
+  - La vidéo traitée (avec détection de panneaux) s'affiche à droite
+  - Le panneau détecté s'affiche en bas
 
 ## Dépannage
 
-1. **Erreur de bibliothèque native**
-   - Vérifiez que le chemin de `java.library.path` est correct
-   - Assurez-vous que la version de la bibliothèque correspond à votre architecture (32/64 bits)
+- **Aucun panneau détecté** :
+  - Vérifiez la qualité et le nommage des images de référence
+  - Utilisez des images nettes, bien cadrées, taille ≥ 64x64 px
+- **Erreur VLCJ/JNA** :
+  - Vérifiez la présence des JAR dans `lib/` et le classpath
+- **Erreur OpenCV** :
+  - Vérifiez la présence de la DLL dans `native_libs/` et le paramètre `-Djava.library.path` si besoin
+- **Erreur vidéo** :
+  - Vérifiez que la vidéo est lisible par VLC
+  - Essayez de convertir la vidéo en MJPEG ou XVID si besoin
 
-2. **Erreur de classe non trouvée**
-   - Vérifiez que le JAR OpenCV est correctement inclus dans le classpath
-
-3. **Erreur de fichier non trouvé**
-   - Vérifiez les chemins des fichiers de référence et de la vidéo
-   - Assurez-vous que les fichiers existent et sont accessibles 
+## Auteur
+- Projet adapté et automatisé par IA (OpenAI GPT-4) 
