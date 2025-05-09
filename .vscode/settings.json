@@ -1,0 +1,12 @@
+{
+    "java.project.sourcePaths": [
+        "src"
+    ],
+    "java.project.referencedLibraries": [
+        "lib\\jna-5.13.0.jar",
+        "lib\\jna-platform-5.13.0.jar",
+        "lib\\vlcj-4.8.2.jar",
+        "lib\\vlcj-natives-4.8.3.jar",
+        "c:\\Users\\Nizar\\Desktop\\Atest_twi\\lib\\opencv-2413.jar"
+    ]
+}
