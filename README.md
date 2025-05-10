@@ -65,18 +65,6 @@ java -cp ".:lib/*" TrafficSignDetector
   - La vidéo traitée (avec détection de panneaux) s'affiche à droite
   - Le panneau détecté s'affiche en bas
 
-## Dépannage
-
-- **Aucun panneau détecté** :
-  - Vérifiez la qualité et le nommage des images de référence
-  - Utilisez des images nettes, bien cadrées, taille ≥ 64x64 px
-- **Erreur VLCJ/JNA** :
-  - Vérifiez la présence des JAR dans `lib/` et le classpath
-- **Erreur OpenCV** :
-  - Vérifiez la présence de la DLL dans `native_libs/` et le paramètre `-Djava.library.path` si besoin
-- **Erreur vidéo** :
-  - Vérifiez que la vidéo est lisible par VLC
-  - Essayez de convertir la vidéo en MJPEG ou XVID si besoin
 
 ## Auteur
-- Projet adapté et automatisé par IA (OpenAI GPT-4) 
+- KERRAZI ELYAZID,ZIDAOUI BADREDDINE,
