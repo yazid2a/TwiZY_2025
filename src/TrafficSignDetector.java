@@ -6,7 +6,6 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.dnn.Dnn;
 import org.opencv.dnn.Net;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -34,15 +33,15 @@ import javax.imageio.ImageIO;
 public class TrafficSignDetector {
 
     // --- Configuration ---
-    private static final Scalar LOWER_RED1 = new Scalar(0, 100, 100);
-    private static final Scalar UPPER_RED1 = new Scalar(10, 255, 255);
-    private static final Scalar LOWER_RED2 = new Scalar(160, 100, 100);
+    private static final Scalar LOWER_RED1 = new Scalar(0, 70, 70);
+    private static final Scalar UPPER_RED1 = new Scalar(15, 255, 255);
+    private static final Scalar LOWER_RED2 = new Scalar(160, 70, 70);
     private static final Scalar UPPER_RED2 = new Scalar(180, 255, 255);
 
-    private static final double MIN_CONTOUR_AREA = 500;
-    private static final double MAX_CONTOUR_AREA = 50000;
-    private static final double MIN_ASPECT_RATIO = 0.7;
-    private static final double MAX_ASPECT_RATIO = 1.3;
+    private static final double MIN_CONTOUR_AREA = 200;
+    private static final double MAX_CONTOUR_AREA = 100000;
+    private static final double MIN_ASPECT_RATIO = 0.5;
+    private static final double MAX_ASPECT_RATIO = 1.5;
 
     // --- Configuration CNN ---
     private static final String CNN_MODEL_PATH_ONNX = "gtsrb_model.onnx"; // CHARGE CE FICHIER
@@ -66,6 +65,13 @@ public class TrafficSignDetector {
     private static String lastDisplayedSign = "None";
     private static EmbeddedMediaPlayerComponent mediaPlayerComponent;
     private static JLabel processedLabel;
+    private static JButton openImageButton; // Bouton pour ouvrir une image en mode image
+    private static boolean isVideoMode = true; // Mode courant
+    private static BufferedImage lastImageLoaded = null;
+
+    // --- Ajout d'un mode de reconnaissance global ---
+    private enum RecognitionMode { API, CNN }
+    private static RecognitionMode recognitionMode = RecognitionMode.API; // Par défaut API
 
     static {
         try {
@@ -136,29 +142,13 @@ public class TrafficSignDetector {
 
     private static void initializeClassNames() {
         classNames = new ArrayList<>();
-        classNames.add("Speed limit (20km/h)"); classNames.add("Speed limit (30km/h)");
-        classNames.add("Speed limit (50km/h)"); classNames.add("Speed limit (60km/h)");
-        classNames.add("Speed limit (70km/h)"); classNames.add("Speed limit (80km/h)");
-        classNames.add("End of speed limit (80km/h)"); classNames.add("Speed limit (100km/h)");
-        classNames.add("Speed limit (120km/h)"); classNames.add("No passing");
-        classNames.add("No passing for vehicles over 3.5 metric tons");
-        classNames.add("Right-of-way at the next intersection"); classNames.add("Priority road");
-        classNames.add("Yield"); classNames.add("Stop"); classNames.add("No vehicles");
-        classNames.add("Vehicles over 3.5 metric tons prohibited"); classNames.add("No entry");
-        classNames.add("General caution"); classNames.add("Dangerous curve to the left");
-        classNames.add("Dangerous curve to the right"); classNames.add("Double curve");
-        classNames.add("Bumpy road"); classNames.add("Slippery road");
-        classNames.add("Road narrows on the right"); classNames.add("Road work");
-        classNames.add("Traffic signals"); classNames.add("Pedestrians");
-        classNames.add("Children crossing"); classNames.add("Bicycles crossing");
-        classNames.add("Beware of ice/snow"); classNames.add("Wild animals crossing");
-        classNames.add("End of all speed and passing limits"); classNames.add("Turn right ahead");
-        classNames.add("Turn left ahead"); classNames.add("Ahead only");
-        classNames.add("Go straight or right"); classNames.add("Go straight or left");
-        classNames.add("Keep right"); classNames.add("Keep left");
-        classNames.add("Roundabout mandatory"); classNames.add("End of no passing");
-        classNames.add("End of no passing by vehicles over 3.5 metric tons");
-        if (classNames.size() != 43) { System.err.println("ERREUR: classNames doit avoir 43 éléments!"); }
+        classNames.add("Speed limit (30km/h)"); // 0
+        classNames.add("Speed limit (50km/h)"); // 1
+        classNames.add("Speed limit (70km/h)"); // 2
+        classNames.add("Speed limit (80km/h)"); // 3
+        classNames.add("Speed limit (110km/h)"); // 4
+        classNames.add("Speed limit (90km/h)"); // 5
+        if (classNames.size() != 6) { System.err.println("ERREUR: classNames doit avoir 6 éléments!"); }
     }
 
     private static boolean loadSignRecognitionModelCNN() {
@@ -185,14 +175,27 @@ public class TrafficSignDetector {
     }
 
     private static RecognizedSign recognizeSignWithCNN(Mat roiBgr) {
+        System.out.println("[DEBUG] recognizeSignWithCNN called");
         if (roiBgr == null || roiBgr.empty() || signRecognitionNet == null || signRecognitionNet.empty() || classNames == null || classNames.isEmpty()) {
+            System.out.println("[DEBUG] ROI vide ou modèle non chargé");
             return null;
         }
+        System.out.println("[DEBUG] ROI size: " + roiBgr.size());
+        System.out.println("[DEBUG] ROI channels: " + roiBgr.channels());
+        Mat roiBgr3 = new Mat();
+        if (roiBgr.channels() == 1) {
+            Imgproc.cvtColor(roiBgr, roiBgr3, Imgproc.COLOR_GRAY2BGR);
+        } else if (roiBgr.channels() == 4) {
+            Imgproc.cvtColor(roiBgr, roiBgr3, Imgproc.COLOR_BGRA2BGR);
+        } else {
+            roiBgr3 = roiBgr.clone();
+        }
         Mat preprocessedRoi = new Mat();
-        Imgproc.resize(roiBgr, preprocessedRoi, new Size(CNN_INPUT_WIDTH, CNN_INPUT_HEIGHT));
+        Imgproc.resize(roiBgr3, preprocessedRoi, new Size(CNN_INPUT_WIDTH, CNN_INPUT_HEIGHT));
+        roiBgr3.release();
         Mat blob = Dnn.blobFromImage(preprocessedRoi, CNN_SCALE_FACTOR,
                                      new Size(CNN_INPUT_WIDTH, CNN_INPUT_HEIGHT),
-                                     CNN_MEAN_SUBTRACTION, CNN_SWAP_RB, CNN_CROP, CvType.CV_32F);
+                                     CNN_MEAN_SUBTRACTION, CNN_SWAP_RB, CNN_CROP);
         if (blob.empty()) {
             System.err.println("recognizeSignWithCNN: Blob is empty.");
             preprocessedRoi.release(); return null;
@@ -204,7 +207,8 @@ public class TrafficSignDetector {
                 Core.MinMaxLocResult mm = Core.minMaxLoc(output);
                 double confidence = mm.maxVal;
                 int predictedClassId = (int) mm.maxLoc.x;
-                System.out.println("CNN Raw Prediction - Class ID: " + predictedClassId +
+                System.out.println("[DEBUG] TEST");
+                System.out.println("[DEBUG] CNN Raw Prediction - Class ID: " + predictedClassId +
                                    ", Name: " + (predictedClassId >= 0 && predictedClassId < classNames.size() ? classNames.get(predictedClassId) : "ID_OOB") +
                                    ", Confidence: " + String.format("%.4f", confidence));
                 output.release();
@@ -215,6 +219,8 @@ public class TrafficSignDetector {
                     } else {
                         System.err.println("CNN Predicted class ID out of bounds: " + predictedClassId);
                     }
+                } else {
+                    System.out.println("[DEBUG] Confiance trop faible: " + confidence);
                 }
             } else {
                 System.err.println("CNN output Mat shape unexpected: " + output.size().toString() +
@@ -246,11 +252,13 @@ public class TrafficSignDetector {
         Rect bestRectThisFrame = null;
 
         for (MatOfPoint contour : potentialContours) {
-            Rect roiRect = Imgproc.boundingRect(contour);
-            Imgproc.rectangle(displayFrame, roiRect.tl(), roiRect.br(), new Scalar(0, 255, 0), 2);
-            Mat roi = new Mat(frame, roiRect);
+            double area = Imgproc.contourArea(contour);
+            Rect rect = Imgproc.boundingRect(contour);
+            Imgproc.rectangle(displayFrame, rect.tl(), rect.br(), new Scalar(0, 255, 0), 2);
+            Mat roi = new Mat(frame, rect);
             RecognizedSign currentRecognizedSign = null;
             if (cnnModelLoaded) {
+                System.out.println("[DEBUG] Appel à recognizeSignWithCNN");
                 currentRecognizedSign = recognizeSignWithCNN(roi);
             }
             roi.release();
@@ -258,7 +266,7 @@ public class TrafficSignDetector {
                 if (currentRecognizedSign.matchCount > bestConfidenceThisFrame) {
                     bestConfidenceThisFrame = currentRecognizedSign.matchCount;
                     bestDetectedSignTextThisFrame = currentRecognizedSign.value;
-                    bestRectThisFrame = roiRect;
+                    bestRectThisFrame = rect;
                 }
             }
         }
@@ -280,8 +288,39 @@ public class TrafficSignDetector {
     private static void initGui() {
         frame = new JFrame("Traffic Sign Detection - Java OpenCV + VLCJ");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        // --- MENU ---
+        JMenuBar menuBar = new JMenuBar();
+        JMenu modeMenu = new JMenu("Mode");
+        JMenuItem videoModeItem = new JMenuItem("Détection Vidéo");
+        JMenuItem imageModeItem = new JMenuItem("Détection Image");
+        modeMenu.add(videoModeItem);
+        modeMenu.add(imageModeItem);
+        menuBar.add(modeMenu);
+
+        // --- MENU RECONNAISSANCE ---
+        JMenu recoMenu = new JMenu("Reconnaissance");
+        JRadioButtonMenuItem apiItem = new JRadioButtonMenuItem("API Python", true);
+        JRadioButtonMenuItem cnnItem = new JRadioButtonMenuItem("CNN Java");
+        ButtonGroup recoGroup = new ButtonGroup();
+        recoGroup.add(apiItem); recoGroup.add(cnnItem);
+        recoMenu.add(apiItem); recoMenu.add(cnnItem);
+        menuBar.add(recoMenu);
+
+        // --- MENU VIDÉO ---
+        JMenu videoMenu = new JMenu("Sélection Vidéo");
+        JMenuItem video1Item = new JMenuItem("Video 1");
+        JMenuItem video2Item = new JMenuItem("Video 2");
+        videoMenu.add(video1Item);
+        videoMenu.add(video2Item);
+        menuBar.add(videoMenu);
+        videoMenu.setEnabled(false);
+        frame.setJMenuBar(menuBar);
+
+        // --- PANELS PRINCIPAUX ---
         JPanel mainPanel = new JPanel(new BorderLayout());
         frame.add(mainPanel);
+
         JPanel videoPanel = new JPanel(new GridLayout(1, 2));
         mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
         videoPanel.add(mediaPlayerComponent);
@@ -289,6 +328,7 @@ public class TrafficSignDetector {
         processedLabel.setHorizontalAlignment(SwingConstants.CENTER);
         videoPanel.add(processedLabel);
         mainPanel.add(videoPanel, BorderLayout.CENTER);
+
         JPanel infoPanel = new JPanel(new GridLayout(2, 1));
         signValueLabel = new JLabel("Panneau détecté : Aucun");
         signValueLabel.setFont(new Font("Arial", Font.BOLD, 16));
@@ -298,6 +338,113 @@ public class TrafficSignDetector {
         infoLabel.setHorizontalAlignment(SwingConstants.CENTER);
         infoPanel.add(infoLabel);
         mainPanel.add(infoPanel, BorderLayout.SOUTH);
+
+        // --- ACTIONS MENU RECONNAISSANCE ---
+        apiItem.addActionListener(e -> recognitionMode = RecognitionMode.API);
+        cnnItem.addActionListener(e -> recognitionMode = RecognitionMode.CNN);
+
+        // --- ACTIONS MENU ---
+        videoModeItem.addActionListener(e -> {
+            isVideoMode = true;
+            openImageButton.setVisible(false);
+            mediaPlayerComponent.setVisible(true);
+            infoLabel.setText("FPS: 0");
+            signValueLabel.setText("Panneau détecté : Aucun");
+            videoMenu.setEnabled(true);
+        });
+
+        imageModeItem.addActionListener(e -> {
+            isVideoMode = false;
+            openImageButton.setVisible(true);
+            mediaPlayerComponent.setVisible(false);
+            processedLabel.setIcon(null);
+            signValueLabel.setText("Panneau détecté : Aucun");
+            infoLabel.setText("");
+            videoMenu.setEnabled(false);
+        });
+
+        video1Item.addActionListener(e -> {
+            String videoPath = "video1.avi";
+            File videoFile = new File(videoPath);
+            if (!videoFile.exists()) {
+                showWarning("Fichier vidéo '" + videoPath + "' introuvable: " + videoFile.getAbsolutePath());
+            } else {
+                mediaPlayerComponent.mediaPlayer().media().play(videoFile.getAbsolutePath());
+            }
+        });
+
+        video2Item.addActionListener(e -> {
+            String videoPath = "video2.avi";
+            File videoFile = new File(videoPath);
+            if (!videoFile.exists()) {
+                showWarning("Fichier vidéo '" + videoPath + "' introuvable: " + videoFile.getAbsolutePath());
+            } else {
+                mediaPlayerComponent.mediaPlayer().media().play(videoFile.getAbsolutePath());
+            }
+        });
+
+        // --- BOUTON OUVRIR IMAGE (modifié pour mode API/CNN) ---
+        openImageButton = new JButton("Ouvrir une image");
+        openImageButton.setVisible(false);
+        openImageButton.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            int result = fileChooser.showOpenDialog(frame);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                try {
+                    BufferedImage img = ImageIO.read(selectedFile);
+                    if (img != null) {
+                        lastImageLoaded = img;
+                        Mat mat = bufferedImageToMat(img);
+                        Mat redMask = extractRedPixels(mat);
+                        List<MatOfPoint> potentialContours = findPotentialSignContours(redMask);
+                        redMask.release();
+                        String resultText = "Aucun panneau détecté";
+                        double maxArea = 0;
+                        Rect bestRect = null;
+                        RecognizedSign bestSign = null;
+                        for (MatOfPoint contour : potentialContours) {
+                            double area = Imgproc.contourArea(contour);
+                            Rect rect = Imgproc.boundingRect(contour);
+                            Imgproc.rectangle(mat, rect.tl(), rect.br(), new Scalar(0, 255, 0), 2);
+                            if (area > maxArea) {
+                                maxArea = area;
+                                bestRect = rect;
+                                if (recognitionMode == RecognitionMode.CNN && cnnModelLoaded) {
+                                    Mat roiMat = new Mat(mat, rect);
+                                    RecognizedSign sign = recognizeSignWithCNN(roiMat);
+                                    roiMat.release();
+                                    bestSign = sign;
+                                } else if (recognitionMode == RecognitionMode.API) {
+                                    Mat roiMat = new Mat(mat, rect);
+                                    BufferedImage roiImg = matToBufferedImage(roiMat);
+                                    String apiResult = detectSignWithApiRobust(roiImg);
+                                    roiMat.release();
+                                    if (apiResult != null && !apiResult.startsWith("Erreur")) {
+                                        bestSign = new RecognizedSign(apiResult, 100);
+                                    }
+                                }
+                            }
+                        }
+                        if (bestRect != null && bestSign != null) {
+                            resultText = bestSign.value;
+                            signValueLabel.setText("<html><span style='color:green;'>Panneau détecté : " + resultText + "</span></html>");
+                        } else {
+                            signValueLabel.setText("<html><span style='color:orange;'>Aucun panneau détecté</span></html>");
+                        }
+                        BufferedImage bufImage = matToBufferedImage(mat);
+                        processedLabel.setIcon(new ImageIcon(bufImage));
+                        infoLabel.setText("");
+                        mat.release();
+                        for (MatOfPoint mop : potentialContours) mop.release();
+                    }
+                } catch (Exception ex) {
+                    signValueLabel.setText("<html><span style='color:red;'>Erreur lors du chargement de l'image</span></html>");
+                }
+            }
+        });
+        mainPanel.add(openImageButton, BorderLayout.NORTH);
+
         frame.setSize(1400, 700);
         frame.setVisible(true);
     }
@@ -360,18 +507,27 @@ public class TrafficSignDetector {
         }
     }
 
+    // --- Fonction robuste d'appel API ---
+    public static String detectSignWithApiRobust(BufferedImage image) {
+        try {
+            String res = detectSignWithApi(image);
+            if (res == null || res.startsWith("Erreur")) {
+                showWarning("Erreur lors de la communication avec l'API Python. Vérifiez que le serveur est lancé.");
+            }
+            return res;
+        } catch (Exception e) {
+            showWarning("Exception API: " + e.getMessage());
+            return "Erreur API";
+        }
+    }
+
+    // --- Timer vidéo (modifié pour mode API/CNN) ---
     public static void main(String[] args) {
+        System.out.println("[DEBUG] MAIN START");
         cnnModelLoaded = loadSignRecognitionModelCNN();
         initGui();
         if (!cnnModelLoaded) {
-            showWarning("Modèle CNN non chargé. L'identification sera désactivée.");
-        }
-        String videoPath = "video2.avi";
-        File videoFile = new File(videoPath);
-        if (!videoFile.exists()) {
-            showWarning("Fichier vidéo '" + videoPath + "' introuvable: " + videoFile.getAbsolutePath());
-        } else {
-            mediaPlayerComponent.mediaPlayer().media().play(videoFile.getAbsolutePath());
+            showWarning("Modèle CNN non chargé. L'identification CNN sera désactivée.");
         }
         Timer detectionTimer = new Timer(100, new ActionListener() {
             long lastFrameTimeNano = System.nanoTime();
@@ -385,53 +541,52 @@ public class TrafficSignDetector {
                         Mat redMask = extractRedPixels(mat);
                         List<MatOfPoint> potentialContours = findPotentialSignContours(redMask);
                         redMask.release();
-
-                        String apiResult = null;
-                        BufferedImage roiImage = null;
-
+                        String resultText = null;
                         double maxArea = 0;
                         Rect bestRect = null;
+                        RecognizedSign bestSign = null;
                         for (MatOfPoint contour : potentialContours) {
                             double area = Imgproc.contourArea(contour);
+                            Rect rect = Imgproc.boundingRect(contour);
+                            Imgproc.rectangle(mat, rect.tl(), rect.br(), new Scalar(0, 255, 0), 2);
                             if (area > maxArea) {
                                 maxArea = area;
-                                bestRect = Imgproc.boundingRect(contour);
+                                bestRect = rect;
+                                if (recognitionMode == RecognitionMode.CNN && cnnModelLoaded) {
+                                    Mat roiMat = new Mat(mat, rect);
+                                    RecognizedSign sign = recognizeSignWithCNN(roiMat);
+                                    roiMat.release();
+                                    bestSign = sign;
+                                } else if (recognitionMode == RecognitionMode.API) {
+                                    Mat roiMat = new Mat(mat, rect);
+                                    BufferedImage roiImg = matToBufferedImage(roiMat);
+                                    String apiResult = detectSignWithApiRobust(roiImg);
+                                    roiMat.release();
+                                    if (apiResult != null && !apiResult.startsWith("Erreur")) {
+                                        bestSign = new RecognizedSign(apiResult, 100);
+                                    }
+                                }
                             }
                         }
-
-                        if (bestRect != null) {
-                            Imgproc.rectangle(mat, bestRect.tl(), bestRect.br(), new Scalar(0, 255, 0), 2);
-                            Mat roiMat = new Mat(mat, bestRect);
-                            roiImage = matToBufferedImage(roiMat);
-                            apiResult = detectSignWithApi(roiImage);
-                            roiMat.release();
+                        if (bestRect != null && bestSign != null) {
+                            resultText = bestSign.value;
+                            signValueLabel.setText("<html><span style='color:green;'>Panneau détecté : " + resultText + "</span></html>");
+                            lastApiResult = resultText;
+                        } else {
+                            signValueLabel.setText("<html><span style='color:orange;'>Aucun panneau détecté</span></html>");
                         }
-
                         BufferedImage bufImage = matToBufferedImage(mat);
                         processedLabel.setIcon(new ImageIcon(bufImage));
-                        if (apiResult != null && !apiResult.startsWith("Erreur") && !apiResult.equals("Aucun panneau détecté")) {
-                            signValueLabel.setText("<html><span style='color:green;'>Panneau détecté : " + apiResult + "</span></html>");
-                            lastApiResult = apiResult;
-                        } else if (apiResult == null) {
-                            // Ne rien changer, garder le dernier panneau détecté
-                        } else if (apiResult.startsWith("Erreur")) {
-                            signValueLabel.setText("<html><span style='color:red;'>" + apiResult + "</span></html>");
-                        }
                         long currentTimeNano = System.nanoTime();
                         double fps = 1_000_000_000.0 / (currentTimeNano - lastFrameTimeNano);
                         lastFrameTimeNano = currentTimeNano;
                         infoLabel.setText(String.format("FPS: %.1f", fps));
-
                         mat.release();
                         for (MatOfPoint mop : potentialContours) mop.release();
                     }
                 }
             }
         });
-        if (cnnModelLoaded || videoFile.exists()) {
-            detectionTimer.start();
-        } else {
-            showWarning("Ni modèle CNN ni vidéo chargés. Timer non démarré.");
-        }
+        detectionTimer.start();
     }
 }
