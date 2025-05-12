@@ -1,5 +1,3 @@
-package projet_twizy;
-
 import org.opencv.core.*;
 //N'importez PAS java.awt.Point si vous ne l'utilisez pas explicitement pour autre chose
 //import java.awt.Point; // Supprimez ou commentez cette ligne si elle existe
@@ -193,25 +191,6 @@ public class TrafficSignDetector {
      }
  }
 
- 
- public static void ImShow(String title, Mat img) {
-		MatOfByte matOfByte = new MatOfByte();
-		Highgui.imencode(".png", img, matOfByte);
-		byte[] byteArray = matOfByte.toArray();
-		BufferedImage buffImage = null;
-		try {
-			InputStream in = new ByteArrayInputStream(byteArray);
-			buffImage = ImageIO.read(in);
-			JFrame frame = new JFrame();
-			frame.setTitle(title);
-			frame.getContentPane().add(new JLabel(new ImageIcon(buffImage)));
-			frame.pack();
-			frame.setVisible(true);
-			
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
 	
 	
 	//--------------------------------------------------------------
@@ -258,7 +237,7 @@ public class TrafficSignDetector {
 			double contourArea = Imgproc.contourArea(contour);
 			matOfPoint2f.fromList(contour.toList());
 			Imgproc.minEnclosingCircle(matOfPoint2f, center, radius);
-			if ((contourArea/(Math.PI*radius[0]*radius[0]))>=0.8) {
+			if ((contourArea/(Math.PI*radius[0]*radius[0]))>=0.8 && radius[0]>15) {
 				circles.add(new Circle(center, (int)radius[0]));
 			}
 		}
